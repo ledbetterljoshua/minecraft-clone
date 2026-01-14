@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conor's Survival World</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Press Start 2P', monospace;
+    }
+    canvas { display: block; }
+
+    /* Crosshair */
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: white;
+      mix-blend-mode: difference;
+    }
+    #crosshair::before {
+      width: 2px;
+      height: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #crosshair::after {
+      width: 100%;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* Health and Hunger Bars */
+    #stats {
+      position: fixed;
+      bottom: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 100;
+    }
+    .stat-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-icon {
+      font-size: 16px;
+    }
+    .stat-container {
+      width: 120px;
+      height: 14px;
+      background: rgba(0,0,0,0.7);
+      border: 2px solid #333;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .stat-fill {
+      height: 100%;
+      transition: width 0.2s ease;
+    }
+    #health-bar {
+      background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+      width: 100%;
+    }
+    #hunger-bar {
+      background: linear-gradient(180deg, #f39c12 0%, #d68910 100%);
+      width: 100%;
+    }
+
+    /* Hotbar */
+    #hotbar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      z-index: 100;
+      background: rgba(0,0,0,0.4);
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .hotbar-slot {
+      width: 56px;
+      height: 56px;
+      background: rgba(40,40,40,0.8);
+      border: 3px solid #555;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border-radius: 4px;
+      transition: all 0.1s;
+    }
+    .hotbar-slot.selected {
+      border-color: #fff;
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
+    .item-name {
+      font-size: 6px;
+      color: white;
+      text-align: center;
+      text-shadow: 1px 1px 1px #000;
+      padding: 2px;
+      line-height: 1.2;
+    }
+    .item-count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 10px;
+      color: white;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    /* Instructions */
+    #instructions {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-size: 8px;
+      background: rgba(0,0,0,0.6);
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 100;
+      pointer-events: none;
+      line-height: 1.8;
+      border: 2px solid #444;
+    }
+
+    /* Debug */
+    #debug {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      color: white;
+      font-size: 8px;
+      background: rgba(0,0,0,0.6);
+      padding: 12px;
+      border-radius: 8px;
+      z-index: 100;
+      pointer-events: none;
+      line-height: 1.8;
+      border: 2px solid #444;
+    }
+
+    /* Loading Screen */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      z-index: 1000;
+      cursor: pointer;
+    }
+    #loading h1 {
+      font-size: 32px;
+      margin-bottom: 20px;
+      text-shadow: 4px 4px 0 #000;
+      animation: pulse 2s infinite;
+    }
+    #loading p {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 30px;
+      animation: blink 1s infinite;
+    }
+    #loading .subtitle {
+      font-size: 14px;
+      color: #f39c12;
+      margin-bottom: 40px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Death Screen */
+    #death-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(139, 0, 0, 0.7);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #death-screen.visible {
+      display: flex;
+    }
+    #death-screen h1 {
+      font-size: 48px;
+      color: white;
+      text-shadow: 4px 4px 0 #000;
+      margin-bottom: 40px;
+    }
+    #respawn-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 16px;
+      padding: 20px 40px;
+      background: #444;
+      color: white;
+      border: 4px solid #666;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #respawn-btn:hover {
+      background: #555;
+      border-color: #888;
+      transform: scale(1.05);
+    }
+
+    /* Damage Overlay */
+    #damage-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 0, 0, 0.3);
+      pointer-events: none;
+      z-index: 99;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    /* Vignette effect */
+    #vignette {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 50;
+      background: radial-gradient(circle at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+    }
+
+    /* Inventory Screen */
+    #inventory-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+    #inventory-screen.visible {
+      display: flex;
+    }
+    .inventory-container {
+      background: #1a1a2e;
+      border: 4px solid #555;
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 520px;
+    }
+    .inventory-title {
+      font-size: 16px;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 0 #000;
+    }
+    .section-title {
+      font-size: 10px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .crafting-section {
+      margin-bottom: 20px;
+    }
+    .crafting-area {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .crafting-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 48px);
+      gap: 4px;
+    }
+    .crafting-arrow {
+      font-size: 24px;
+      color: #666;
+    }
+    .crafting-result {
+      width: 56px;
+      height: 56px;
+    }
+    .inventory-section {
+      margin-bottom: 15px;
+    }
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 48px);
+      gap: 4px;
+    }
+    .hotbar-section {
+      border-top: 2px solid #333;
+      padding-top: 15px;
+    }
+    .inventory-hotbar {
+      display: grid;
+      grid-template-columns: repeat(9, 48px);
+      gap: 4px;
+    }
+    .inv-slot {
+      width: 48px;
+      height: 48px;
+      background: rgba(40, 40, 40, 0.9);
+      border: 2px solid #555;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .inv-slot:hover {
+      border-color: #888;
+      background: rgba(60, 60, 60, 0.9);
+    }
+    .inv-slot.selected {
+      border-color: #fff;
+      box-shadow: 0 0 8px rgba(255,255,255,0.3);
+    }
+    .inv-slot.has-item {
+      background: rgba(50, 50, 50, 0.95);
+    }
+    .inv-slot .item-preview {
+      width: 32px;
+      height: 32px;
+      border-radius: 2px;
+    }
+    .inv-slot .slot-name {
+      font-size: 5px;
+      color: #ccc;
+      text-align: center;
+      max-width: 44px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+    .inv-slot .slot-count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 10px;
+      color: white;
+      text-shadow: 1px 1px 2px #000;
+    }
+    .result-slot {
+      background: rgba(80, 60, 30, 0.9);
+      border-color: #886622;
+    }
+    .result-slot:hover {
+      background: rgba(100, 80, 40, 0.9);
+      border-color: #aa8833;
+    }
+    .result-slot.has-result {
+      background: rgba(100, 80, 40, 0.95);
+      border-color: #ccaa44;
+      animation: resultGlow 1s infinite alternate;
+    }
+    @keyframes resultGlow {
+      from { box-shadow: 0 0 5px rgba(255,200,50,0.3); }
+      to { box-shadow: 0 0 15px rgba(255,200,50,0.6); }
+    }
+
+    /* Held item cursor */
+    #held-item {
+      position: fixed;
+      pointer-events: none;
+      z-index: 600;
+      display: none;
+    }
+    #held-item.visible {
+      display: block;
+    }
+    #held-item .item-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 4px;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    #held-item .item-count {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      font-size: 10px;
+      color: white;
+      text-shadow: 1px 1px 2px #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <h1>SURVIVAL WORLD</h1>
+    <p class="subtitle">Made for Conor 🎮</p>
+    <p>Click to Start</p>
+  </div>
+
+  <div id="vignette"></div>
+  <div id="damage-overlay"></div>
+  <div id="crosshair"></div>
+  <div id="held-item"></div>
+
+  <div id="instructions">
+    WASD - Move<br>
+    SPACE - Jump<br>
+    SHIFT - Sprint<br>
+    1-9 - Select Item<br>
+    E - Eat Food<br>
+    I - Inventory<br>
+    Left Click - Attack/Break<br>
+    Right Click - Place<br>
+    ESC - Close/Release
+  </div>
+
+  <div id="debug"></div>
+
+  <div id="stats">
+    <div class="stat-bar">
+      <span class="stat-icon">❤️</span>
+      <div class="stat-container">
+        <div class="stat-fill" id="health-bar"></div>
+      </div>
+    </div>
+    <div class="stat-bar">
+      <span class="stat-icon">🍖</span>
+      <div class="stat-container">
+        <div class="stat-fill" id="hunger-bar"></div>
+      </div>
+    </div>
+    <div class="stat-bar" id="oxygen-stat" style="display: none;">
+      <span class="stat-icon">💨</span>
+      <div class="stat-container">
+        <div class="stat-fill" id="oxygen-bar" style="background: linear-gradient(180deg, #3498db 0%, #2980b9 100%);"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hotbar"></div>
+
+  <div id="death-screen">
+    <h1>YOU DIED!</h1>
+    <button id="respawn-btn">RESPAWN</button>
+  </div>
+
+  <!-- Inventory/Crafting Screen -->
+  <div id="inventory-screen">
+    <div class="inventory-container">
+      <div class="inventory-title">Inventory</div>
+
+      <div class="crafting-section">
+        <div class="section-title">Crafting</div>
+        <div class="crafting-area">
+          <div class="crafting-grid" id="crafting-grid">
+            <!-- 2x2 grid filled by JS -->
+          </div>
+          <div class="crafting-arrow">→</div>
+          <div class="crafting-result" id="crafting-result">
+            <!-- Result slot filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="inventory-section">
+        <div class="section-title">Items</div>
+        <div class="inventory-grid" id="inventory-grid">
+          <!-- 9x3 = 27 slots filled by JS -->
+        </div>
+      </div>
+
+      <div class="hotbar-section">
+        <div class="section-title">Hotbar</div>
+        <div class="inventory-hotbar" id="inventory-hotbar">
+          <!-- 9 slots filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
