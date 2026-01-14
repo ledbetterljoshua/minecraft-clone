@@ -35,7 +35,7 @@ const VignetteShader = {
 };
 import { Player } from './player';
 import { BlockType, BLOCKS } from './blocks';
-import { MobManager, Mob } from './mobs';
+import { MobManager } from './mobs';
 import { Inventory } from './inventory';
 import { ParticleSystem } from './particles';
 import { sound } from './sound';
